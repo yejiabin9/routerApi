@@ -2,22 +2,15 @@ package main
 
 import (
 	"fmt"
-	"github.com/afex/hystrix-go/hystrix"
 	"github.com/asim/go-micro/plugins/registry/consul/v3"
-	ratelimit "github.com/asim/go-micro/plugins/wrapper/ratelimiter/uber/v3"
-	opentracing2 "github.com/asim/go-micro/plugins/wrapper/trace/opentracing/v3"
 	"github.com/asim/go-micro/v3"
 	"github.com/asim/go-micro/v3/registry"
 	"github.com/asim/go-micro/v3/server"
-	"github.com/opentracing/opentracing-go"
-	"github.com/yejiabin9/common"
+	"github.com/sirupsen/logrus"
 	go_micro_service_router "github.com/yejiabin9/router/proto/router"
 
 	_ "github.com/jinzhu/gorm/dialects/mysql"
 	"github.com/yejiabin9/routerApi/handler"
-	hystrix2 "github.com/yejiabin9/routerApi/plugin/hystrix"
-	"net"
-	"net/http"
 	"strconv"
 
 	routerApi "github.com/yejiabin9/routerApi/proto/routerApi"
@@ -25,11 +18,11 @@ import (
 
 var (
 	//服务地址
-	hostIp = "192.168.0.108"
+	hostIp = "39.104.82.215"
 	//服务地址
-	serviceHost = hostIp
+	serviceHost = "192.168.31.50"
 	//服务端口
-	servicePort = "8082"
+	servicePort = "8088"
 	//注册中心配置
 	consulHost       = hostIp
 	consulPort int64 = 8500
@@ -51,17 +44,17 @@ func main() {
 		}
 	})
 
-	//2.添加链路追踪
-	t, io, err := common.NewTracer("go.micro.api.routerApi", tracerHost+":"+strconv.Itoa(tracerPort))
-	if err != nil {
-		common.Error(err)
-	}
-	defer io.Close()
-	opentracing.SetGlobalTracer(t)
+	////2.添加链路追踪
+	//t, io, err := common.NewTracer("go.micro.api.routerApi", tracerHost+":"+strconv.Itoa(tracerPort))
+	//if err != nil {
+	//	common.Error(err)
+	//}
+	//defer io.Close()
+	//opentracing.SetGlobalTracer(t)
 
 	//3.添加熔断器
-	hystrixStreamHandler := hystrix.NewStreamHandler()
-	hystrixStreamHandler.Start()
+	//hystrixStreamHandler := hystrix.NewStreamHandler()
+	//hystrixStreamHandler.Start()
 
 	//添加日志中心
 	//1）需要程序日志打入到日志文件中
@@ -70,17 +63,17 @@ func main() {
 	fmt.Println("日志统一记录在根目录 micro.log 文件中，请点击查看日志！")
 
 	//启动监听程序
-	go func() {
-		//http://192.168.0.112:9092/turbine/turbine.stream
-		//看板访问地址 http://127.0.0.1:9002/hystrix，url后面一定要带 /hystrix
-		err = http.ListenAndServe(net.JoinHostPort("0.0.0.0", strconv.Itoa(hystrixPort)), hystrixStreamHandler)
-		if err != nil {
-			common.Error(err)
-		}
-	}()
-
-	//4.添加监控
-	common.PrometheusBoot(prometheusPort)
+	//go func() {
+	//	//http://192.168.0.112:9092/turbine/turbine.stream
+	//	//看板访问地址 http://127.0.0.1:9002/hystrix，url后面一定要带 /hystrix
+	//	err = http.ListenAndServe(net.JoinHostPort("0.0.0.0", strconv.Itoa(hystrixPort)), hystrixStreamHandler)
+	//	if err != nil {
+	//		common.Error(err)
+	//	}
+	//}()
+	//
+	////4.添加监控
+	//common.PrometheusBoot(prometheusPort)
 
 	//5.创建服务
 	service := micro.NewService(
@@ -96,14 +89,14 @@ func main() {
 		//添加注册中心
 		micro.Registry(consul),
 		//添加链路追踪
-		micro.WrapHandler(opentracing2.NewHandlerWrapper(opentracing.GlobalTracer())),
-		micro.WrapClient(opentracing2.NewClientWrapper(opentracing.GlobalTracer())),
-		//只作为客户端的时候起作用
-		micro.WrapClient(hystrix2.NewClientHystrixWrapper()),
-		//添加限流
-		micro.WrapHandler(ratelimit.NewHandlerWrapper(1000)),
-		//增加负载均衡
-		micro.WrapClient(roundrobin.NewClientWrapper()),
+		//	micro.WrapHandler(opentracing2.NewHandlerWrapper(opentracing.GlobalTracer())),
+		//	micro.WrapClient(opentracing2.NewClientWrapper(opentracing.GlobalTracer())),
+		//	//只作为客户端的时候起作用
+		//	micro.WrapClient(hystrix2.NewClientHystrixWrapper()),
+		//	//添加限流
+		//	micro.WrapHandler(ratelimit.NewHandlerWrapper(1000)),
+		//	//增加负载均衡
+		//	micro.WrapClient(roundrobin.NewClientWrapper()),
 	)
 
 	service.Init()
@@ -114,12 +107,12 @@ func main() {
 	routerService := go_micro_service_router.NewRouterService("go.micro.service.router", service.Client())
 	// 注册控制器
 	if err := routerApi.RegisterRouterApiHandler(service.Server(), &handler.RouterApi{RouterService: routerService}); err != nil {
-		common.Error(err)
+		logrus.Error(err)
 	}
 
 	// 启动服务
 	if err := service.Run(); err != nil {
 		//输出启动失败信息
-		common.Fatal(err)
+		logrus.Fatal(err)
 	}
 }
